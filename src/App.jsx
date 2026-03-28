@@ -14,8 +14,8 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 // ─── DEFAULTS ─────────────────────────────────────────────────────────────────
 const DEFAULT_FEES = {
-  PP1:    { label: "PP1",     termFee: 12500 },
-  PP2:    { label: "PP2",     termFee: 12500 },
+  PP1: { label: "PP1", termFee: 12500 },
+  PP2: { label: "PP2", termFee: 12500 },
   Grade1: { label: "Grade 1", termFee: 15000 },
   Grade2: { label: "Grade 2", termFee: 15000 },
   Grade3: { label: "Grade 3", termFee: 18000 },
@@ -25,10 +25,10 @@ const DEFAULT_TERMS = ["Term 1 2025", "Term 2 2025", "Term 3 2025"];
 const DEFAULT_PASSWORD = "Admin@2025";
 
 const PAYMENT_METHODS = [
-  { key: "cash",         label: "Cash",         icon: "💵", color: "#3dd68c" },
-  { key: "mpesa",        label: "M-Pesa",        icon: "📱", color: "#4cc764" },
-  { key: "airtel_money", label: "Airtel Money",  icon: "🔴", color: "#ff4444" },
-  { key: "bank",         label: "Bank Transfer", icon: "🏦", color: "#60a5fa" },
+  { key: "cash", label: "Cash", icon: "💵", color: "#3dd68c" },
+  { key: "mpesa", label: "M-Pesa", icon: "📱", color: "#4cc764" },
+  { key: "airtel_money", label: "Airtel Money", icon: "🔴", color: "#ff4444" },
+  { key: "bank", label: "Bank Transfer", icon: "🏦", color: "#60a5fa" },
 ];
 
 // ─── STORAGE — uses localStorage for local Vite deployment ────────────────────
@@ -59,12 +59,12 @@ const bS = (v = "gold", full) => ({
   width: full ? "100%" : undefined,
   background: v === "gold" ? `linear-gradient(135deg,${G.gold},${G.goldD})`
     : v === "danger" ? "rgba(255,80,80,0.15)"
-    : v === "blue"   ? "rgba(96,165,250,0.15)"
-    : "rgba(255,255,255,0.07)",
+      : v === "blue" ? "rgba(96,165,250,0.15)"
+        : "rgba(255,255,255,0.07)",
   color: v === "gold" ? G.dark : v === "danger" ? G.red : v === "blue" ? G.blue : G.text,
   border: v === "gold" ? "none" : v === "danger" ? `1px solid rgba(255,80,80,0.3)`
-    : v === "ghost"  ? `1px solid rgba(255,255,255,0.14)`
-    : v === "blue"   ? `1px solid rgba(96,165,250,0.3)` : "none",
+    : v === "ghost" ? `1px solid rgba(255,255,255,0.14)`
+      : v === "blue" ? `1px solid rgba(96,165,250,0.3)` : "none",
 });
 
 // ─── MINI COMPONENTS ──────────────────────────────────────────────────────────
@@ -74,15 +74,15 @@ const Card = ({ children, style }) => (
 const SecHead = ({ children }) => (
   <div style={{ padding: "16px 24px 14px", color: G.text, fontWeight: 700, fontSize: 15, borderBottom: `1px solid ${G.border}` }}>{children}</div>
 );
-const Lbl  = ({ children }) => <div style={{ color: G.muted, fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>{children}</div>;
-const Err  = ({ msg }) => msg ? <div style={{ color: G.red, fontSize: 11, marginTop: 4 }}>{msg}</div> : null;
+const Lbl = ({ children }) => <div style={{ color: G.muted, fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>{children}</div>;
+const Err = ({ msg }) => msg ? <div style={{ color: G.red, fontSize: 11, marginTop: 4 }}>{msg}</div> : null;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOGIN
 // ═══════════════════════════════════════════════════════════════════════════════
 function LoginPage({ onLogin }) {
-  const [pw, setPw]     = useState("");
-  const [err, setErr]   = useState("");
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(false);
@@ -90,8 +90,8 @@ function LoginPage({ onLogin }) {
   const submit = async () => {
     if (!pw) { setErr("Password required"); return; }
     setBusy(true);
-    const hash     = await sha256(pw);
-    const stored   = await sGet(SK.auth);
+    const hash = await sha256(pw);
+    const stored = await sGet(SK.auth);
     const expected = stored?.hash || await sha256(DEFAULT_PASSWORD);
     if (!stored) await sSet(SK.auth, { hash: await sha256(DEFAULT_PASSWORD) });
     if (hash === expected) { onLogin(); }
@@ -149,21 +149,21 @@ function LoginPage({ onLogin }) {
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [authed,   setAuthed]   = useState(false);
-  const [booting,  setBooting]  = useState(true);
-  const [fees,     setFees]     = useState(DEFAULT_FEES);
-  const [terms,    setTerms]    = useState(DEFAULT_TERMS);
+  const [authed, setAuthed] = useState(false);
+  const [booting, setBooting] = useState(true);
+  const [fees, setFees] = useState(DEFAULT_FEES);
+  const [terms, setTerms] = useState(DEFAULT_TERMS);
   const [students, setStudents] = useState([]);
-  const [tab,      setTab]      = useState("entry");
-  const [receipt,  setReceipt]  = useState(null);
-  const [search,   setSearch]   = useState("");
+  const [tab, setTab] = useState("entry");
+  const [receipt, setReceipt] = useState(null);
+  const [search, setSearch] = useState("");
   const printRef = useRef();
 
   useEffect(() => {
     (async () => {
       const [cfg, studs] = await Promise.all([sGet(SK.cfg), sGet(SK.students)]);
-      if (cfg?.fees)           setFees(cfg.fees);
-      if (cfg?.terms)          setTerms(cfg.terms);
+      if (cfg?.fees) setFees(cfg.fees);
+      if (cfg?.terms) setTerms(cfg.terms);
       if (Array.isArray(studs)) setStudents(studs);
       setBooting(false);
     })();
@@ -190,10 +190,10 @@ export default function App() {
     reader.onload = async ev => {
       try {
         const data = JSON.parse(ev.target.result);
-        if (data.fees)                setFees(data.fees);
-        if (data.terms)               setTerms(data.terms);
+        if (data.fees) setFees(data.fees);
+        if (data.terms) setTerms(data.terms);
         if (Array.isArray(data.students)) setStudents(data.students);
-        await sSet(SK.cfg,      { fees: data.fees || fees, terms: data.terms || terms });
+        await sSet(SK.cfg, { fees: data.fees || fees, terms: data.terms || terms });
         await sSet(SK.students, data.students || []);
         alert("✅ Data imported successfully!");
       } catch { alert("❌ Invalid backup file."); }
@@ -202,10 +202,10 @@ export default function App() {
     e.target.value = "";
   };
 
-  if (booting)  return <div style={{ minHeight: "100vh", background: G.bg, display: "flex", alignItems: "center", justifyContent: "center", color: G.muted, fontFamily: "Georgia,serif" }}>Loading…</div>;
-  if (!authed)  return <LoginPage onLogin={() => setAuthed(true)} />;
+  if (booting) return <div style={{ minHeight: "100vh", background: G.bg, display: "flex", alignItems: "center", justifyContent: "center", color: G.muted, fontFamily: "Georgia,serif" }}>Loading…</div>;
+  if (!authed) return <LoginPage onLogin={() => setAuthed(true)} />;
 
-  const totalCollected   = students.reduce((a, s) => a + s.totalPaid, 0);
+  const totalCollected = students.reduce((a, s) => a + s.totalPaid, 0);
   const totalOutstanding = students.reduce((a, s) => a + Math.max(0, s.balance), 0);
   const filtered = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -213,12 +213,12 @@ export default function App() {
   );
 
   const TABS = [
-    { key: "entry",    icon: "💳", label: "Record"   },
-    { key: "receipt",  icon: "🧾", label: "Receipt"  },
-    { key: "ledger",   icon: "📋", label: "Ledger"   },
-    { key: "dues",     icon: "⚠️", label: "Dues"     },
+    { key: "entry", icon: "💳", label: "Record" },
+    { key: "receipt", icon: "🧾", label: "Receipt" },
+    { key: "ledger", icon: "📋", label: "Ledger" },
+    { key: "dues", icon: "⚠️", label: "Dues" },
     { key: "settings", icon: "⚙️", label: "Settings" },
-    { key: "backup",   icon: "💾", label: "Backup"   },
+    { key: "backup", icon: "💾", label: "Backup" },
   ];
 
   return (
@@ -250,10 +250,10 @@ export default function App() {
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             flex: 1, padding: "8px 2px", borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "inherit", transition: "all .18s",
             background: tab === t.key ? `linear-gradient(135deg,${G.gold},${G.goldD})` : "rgba(255,255,255,0.04)",
-            color:  tab === t.key ? G.dark  : G.muted,
-            border: tab === t.key ? "none"  : "1px solid rgba(255,255,255,0.07)",
-            transform:  tab === t.key ? "translateY(-2px)" : "none",
-            boxShadow:  tab === t.key ? `0 4px 14px rgba(233,184,74,.28)` : "none",
+            color: tab === t.key ? G.dark : G.muted,
+            border: tab === t.key ? "none" : "1px solid rgba(255,255,255,0.07)",
+            transform: tab === t.key ? "translateY(-2px)" : "none",
+            boxShadow: tab === t.key ? `0 4px 14px rgba(233,184,74,.28)` : "none",
           }}>
             <div>{t.icon}</div><div style={{ marginTop: 2 }}>{t.label}</div>
           </button>
@@ -262,12 +262,12 @@ export default function App() {
 
       {/* CONTENT */}
       <div style={{ maxWidth: 900, margin: "0 auto" }} className="tc" key={tab}>
-        {tab === "entry"    && <EntryTab    fees={fees} terms={terms} students={students} saveStudents={saveStudents} setReceipt={setReceipt} setTab={setTab} />}
-        {tab === "receipt"  && <ReceiptTab  receipt={receipt} printRef={printRef} setTab={setTab} fees={fees} />}
-        {tab === "ledger"   && <LedgerTab   students={filtered} search={search} setSearch={setSearch} fees={fees} />}
-        {tab === "dues"     && <DuesTab     students={students} fees={fees} totalOutstanding={totalOutstanding} />}
+        {tab === "entry" && <EntryTab fees={fees} terms={terms} students={students} saveStudents={saveStudents} setReceipt={setReceipt} setTab={setTab} />}
+        {tab === "receipt" && <ReceiptTab receipt={receipt} printRef={printRef} setTab={setTab} fees={fees} />}
+        {tab === "ledger" && <LedgerTab students={filtered} search={search} setSearch={setSearch} fees={fees} />}
+        {tab === "dues" && <DuesTab students={students} fees={fees} totalOutstanding={totalOutstanding} />}
         {tab === "settings" && <SettingsTab fees={fees} terms={terms} saveSettings={saveSettings} />}
-        {tab === "backup"   && <BackupTab   exportData={exportData} importData={importData} students={students} fees={fees} terms={terms} />}
+        {tab === "backup" && <BackupTab exportData={exportData} importData={importData} students={students} fees={fees} terms={terms} />}
       </div>
     </div>
   );
@@ -280,19 +280,19 @@ function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
   const classes = Object.keys(fees);
   const [form, setForm] = useState({ name: "", cls: classes[0] || "", term: terms[0] || "", paid: "", method: "cash", ref: "" });
   const [errors, setErrors] = useState({});
-  const [done,   setDone]   = useState(false);
+  const [done, setDone] = useState(false);
 
   // Derive valid cls/term at render time — no useEffect needed, no loop possible
-  const activeCls  = classes.includes(form.cls)  ? form.cls  : (classes[0]  || "");
-  const activeTerm = terms.includes(form.term)   ? form.term : (terms[0]    || "");
+  const activeCls = classes.includes(form.cls) ? form.cls : (classes[0] || "");
+  const activeTerm = terms.includes(form.term) ? form.term : (terms[0] || "");
 
   const needsRef = ["mpesa", "airtel_money", "bank"].includes(form.method);
 
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = "Student name required";
-    if (!activeCls)        e.cls  = "Select a class";
-    if (!activeTerm)       e.term = "Add terms in Settings first";
+    if (!activeCls) e.cls = "Select a class";
+    if (!activeTerm) e.term = "Add terms in Settings first";
     if (!form.paid || isNaN(form.paid) || Number(form.paid) <= 0) e.paid = "Enter a valid amount";
     if (needsRef && !form.ref.trim()) e.ref = `${PAYMENT_METHODS.find(m => m.key === form.method)?.label} reference required`;
     return e;
@@ -304,7 +304,7 @@ function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
     setErrors({});
     const termFee = fees[activeCls]?.termFee || 0;
     const paidAmt = Number(form.paid);
-    const recNo   = genReceipt();
+    const recNo = genReceipt();
     const updated = [...students];
     const idx = updated.findIndex(s => s.name.toLowerCase() === form.name.trim().toLowerCase() && s.cls === activeCls);
     const entry = { term: activeTerm, fee: termFee, paid: paidAmt, method: form.method, ref: form.ref, date: todayStr(), receiptNo: recNo };
@@ -318,8 +318,8 @@ function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
         s.terms[tIdx].payments.push(entry);
       } else { s.terms.push({ ...entry, payments: [entry] }); }
       s.totalPaid = s.terms.reduce((a, t) => a + t.paid, 0);
-      s.totalFee  = s.terms.reduce((a, t) => a + t.fee,  0);
-      s.balance   = s.totalFee - s.totalPaid;
+      s.totalFee = s.terms.reduce((a, t) => a + t.fee, 0);
+      s.balance = s.totalFee - s.totalPaid;
       updated[idx] = s;
     } else {
       updated.push({ id: uid(), name: form.name.trim(), cls: activeCls, terms: [{ ...entry, payments: [entry] }], totalPaid: paidAmt, totalFee: termFee, balance: termFee - paidAmt });
@@ -331,7 +331,7 @@ function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
   };
 
   const termFee = fees[activeCls]?.termFee || 0;
-  const paid    = Number(form.paid) || 0;
+  const paid = Number(form.paid) || 0;
   const balance = Math.max(0, termFee - paid);
 
   return (
@@ -400,10 +400,10 @@ function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
                 <button key={m.key} onClick={() => { setForm(f => ({ ...f, method: m.key, ref: "" })); setErrors(er => ({ ...er, ref: "" })); }} style={{
                   padding: "11px 6px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 12, transition: "all .15s",
                   background: form.method === m.key ? `${m.color}22` : "rgba(255,255,255,0.04)",
-                  border:     form.method === m.key ? `2px solid ${m.color}` : "1.5px solid rgba(255,255,255,0.1)",
-                  color:      form.method === m.key ? m.color : G.muted,
-                  transform:  form.method === m.key ? "translateY(-2px)" : "none",
-                  boxShadow:  form.method === m.key ? `0 4px 12px ${m.color}33` : "none",
+                  border: form.method === m.key ? `2px solid ${m.color}` : "1.5px solid rgba(255,255,255,0.1)",
+                  color: form.method === m.key ? m.color : G.muted,
+                  transform: form.method === m.key ? "translateY(-2px)" : "none",
+                  boxShadow: form.method === m.key ? `0 4px 12px ${m.color}33` : "none",
                 }}>
                   <div style={{ fontSize: 18, marginBottom: 4 }}>{m.icon}</div>
                   <div>{m.label}</div>
@@ -607,10 +607,10 @@ function DuesTab({ students, fees, totalOutstanding }) {
 // SETTINGS TAB
 // ═══════════════════════════════════════════════════════════════════════════════
 function SettingsTab({ fees, terms, saveSettings }) {
-  const [ef,  setEf]  = useState(() => JSON.parse(JSON.stringify(fees)));
-  const [et,  setEt]  = useState([...terms]);
+  const [ef, setEf] = useState(() => JSON.parse(JSON.stringify(fees)));
+  const [et, setEt] = useState([...terms]);
   const [newTerm, setNewTerm] = useState("");
-  const [newCls,  setNewCls]  = useState({ key: "", label: "", termFee: "" });
+  const [newCls, setNewCls] = useState({ key: "", label: "", termFee: "" });
   const [saved, setSaved] = useState(false);
   const [tErr, setTErr] = useState("");
   const [cErr, setCErr] = useState("");
@@ -635,10 +635,10 @@ function SettingsTab({ fees, terms, saveSettings }) {
   };
   const changePw = async () => {
     if (!oldPw || !newPw || !cfPw) { setPwMsg({ type: "err", text: "All fields required" }); return; }
-    if (newPw !== cfPw)            { setPwMsg({ type: "err", text: "New passwords don't match" }); return; }
-    if (newPw.length < 6)          { setPwMsg({ type: "err", text: "Minimum 6 characters" }); return; }
-    const oldHash  = await sha256(oldPw);
-    const stored   = await sGet(SK.auth);
+    if (newPw !== cfPw) { setPwMsg({ type: "err", text: "New passwords don't match" }); return; }
+    if (newPw.length < 6) { setPwMsg({ type: "err", text: "Minimum 6 characters" }); return; }
+    const oldHash = await sha256(oldPw);
+    const stored = await sGet(SK.auth);
     const expected = stored?.hash || await sha256(DEFAULT_PASSWORD);
     if (oldHash !== expected) { setPwMsg({ type: "err", text: "Current password incorrect" }); return; }
     await sSet(SK.auth, { hash: await sha256(newPw) });
@@ -727,7 +727,7 @@ function SettingsTab({ fees, terms, saveSettings }) {
 function BackupTab({ exportData, importData, students, fees, terms }) {
   const fileRef = useRef();
   const totalPaid = students.reduce((a, s) => a + s.totalPaid, 0);
-  const totalDue  = students.reduce((a, s) => a + Math.max(0, s.balance), 0);
+  const totalDue = students.reduce((a, s) => a + Math.max(0, s.balance), 0);
   const methodTotals = {};
   students.forEach(s => s.terms.forEach(t => (t.payments || []).forEach(p => {
     methodTotals[p.method] = (methodTotals[p.method] || 0) + p.paid;
