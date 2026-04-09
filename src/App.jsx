@@ -11,6 +11,7 @@ const fmt = n => "KES " + Number(n).toLocaleString("en-KE", { minimumFractionDig
 const genReceipt = () => "SAN-" + Date.now().toString().slice(-6);
 const todayStr = () => new Date().toLocaleDateString("en-KE", { day: "2-digit", month: "long", year: "numeric" });
 const uid = () => Math.random().toString(36).slice(2, 9);
+const currentYear = new Date().getFullYear();
 
 // ─── DEFAULTS ─────────────────────────────────────────────────────────────────
 const DEFAULT_FEES = {
@@ -21,7 +22,7 @@ const DEFAULT_FEES = {
   Grade3: { label: "Grade 3", termFee: 18000 },
   Grade4: { label: "Grade 4", termFee: 18000 },
 };
-const DEFAULT_TERMS = ["Term 1 2025", "Term 2 2025", "Term 3 2025"];
+const TERM_LABELS = ["Term 1", "Term 2", "Term 3"];
 const DEFAULT_PASSWORD = "Admin@2025";
 
 const PAYMENT_METHODS = [
@@ -31,7 +32,7 @@ const PAYMENT_METHODS = [
   { key: "bank", label: "Bank Transfer", icon: "🏦", color: "#60a5fa" },
 ];
 
-// ─── STORAGE — uses localStorage for local Vite deployment ────────────────────
+// ─── STORAGE ──────────────────────────────────────────────────────────────────
 const SK = { auth: "san:auth", cfg: "san:cfg", students: "san:students" };
 async function sGet(k) {
   try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; }
@@ -47,15 +48,29 @@ const G = {
   gold: "#e9b84a", goldD: "#c49020",
   green: "#3dd68c", red: "#ff6b6b", amber: "#fbbf24", blue: "#60a5fa",
   text: "#f0f0e8", muted: "rgba(240,240,232,0.52)",
+  // Dropdown-specific: light background, dark text for readability
+  dropBg: "#1e3d28", dropText: "#f0f0e8", dropBorder: "#3a6b4a",
 };
+
+// ─── DROPDOWN STYLE: readable font + visible color ────────────────────────────
+const dropStyle = (err) => ({
+  width: "100%", padding: "11px 14px", borderRadius: 9, outline: "none", fontSize: 14,
+  background: G.dropBg, color: G.dropText, boxSizing: "border-box", cursor: "pointer",
+  border: `1.5px solid ${err ? G.red : G.dropBorder}`, fontFamily: "'Georgia', serif",
+  fontWeight: 600, appearance: "none", WebkitAppearance: "none",
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23e9b84a' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat", backgroundPosition: "right 14px center",
+  paddingRight: 38,
+});
+
 const iS = (err) => ({
   width: "100%", padding: "11px 14px", borderRadius: 9, outline: "none", fontSize: 14,
   background: "rgba(255,255,255,0.06)", color: G.text, boxSizing: "border-box",
-  border: `1.5px solid ${err ? G.red : "rgba(255,255,255,0.14)"}`, fontFamily: "inherit",
+  border: `1.5px solid ${err ? G.red : "rgba(255,255,255,0.14)"}`, fontFamily: "'Georgia', serif",
 });
 const bS = (v = "gold", full) => ({
   padding: "10px 20px", borderRadius: 10, cursor: "pointer",
-  fontWeight: 700, fontSize: 14, fontFamily: "inherit", transition: "opacity .15s",
+  fontWeight: 700, fontSize: 14, fontFamily: "'Georgia', serif", transition: "opacity .15s",
   width: full ? "100%" : undefined,
   background: v === "gold" ? `linear-gradient(135deg,${G.gold},${G.goldD})`
     : v === "danger" ? "rgba(255,80,80,0.15)"
@@ -76,6 +91,15 @@ const SecHead = ({ children }) => (
 );
 const Lbl = ({ children }) => <div style={{ color: G.muted, fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>{children}</div>;
 const Err = ({ msg }) => msg ? <div style={{ color: G.red, fontSize: 11, marginTop: 4 }}>{msg}</div> : null;
+
+// ─── SELECT WRAPPER with custom chevron ───────────────────────────────────────
+const Select = ({ value, onChange, children, err }) => (
+  <div style={{ position: "relative", width: "100%" }}>
+    <select value={value} onChange={onChange} style={dropStyle(err)}>
+      {children}
+    </select>
+  </div>
+);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOGIN
@@ -107,7 +131,8 @@ function LoginPage({ onLogin }) {
         button:hover  { opacity:.85 }
         button:active { transform:scale(.97) }
         * { box-sizing:border-box }
-        select option { background:#122b1a }
+        select { background:${G.dropBg} !important; color:${G.dropText} !important; }
+        select option { background:${G.dropBg}; color:${G.dropText}; font-family:Georgia,serif; font-size:14px; padding:8px; }
         input::placeholder { color:rgba(240,240,232,.22) }
         input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none }
         @keyframes sIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
@@ -152,37 +177,116 @@ export default function App() {
   const [authed, setAuthed] = useState(false);
   const [booting, setBooting] = useState(true);
   const [fees, setFees] = useState(DEFAULT_FEES);
-  const [terms, setTerms] = useState(DEFAULT_TERMS);
+  // year is stored in cfg; terms are derived as "Term 1 YEAR" etc.
+  const [activeYear, setActiveYear] = useState(String(currentYear));
   const [students, setStudents] = useState([]);
   const [tab, setTab] = useState("entry");
   const [receipt, setReceipt] = useState(null);
   const [search, setSearch] = useState("");
   const printRef = useRef();
 
+  // Derive full term strings from year
+  const terms = TERM_LABELS.map(t => `${t} ${activeYear}`);
+
   useEffect(() => {
     (async () => {
       const [cfg, studs] = await Promise.all([sGet(SK.cfg), sGet(SK.students)]);
       if (cfg?.fees) setFees(cfg.fees);
-      if (cfg?.terms) setTerms(cfg.terms);
+      if (cfg?.activeYear) setActiveYear(cfg.activeYear);
       if (Array.isArray(studs)) setStudents(studs);
       setBooting(false);
     })();
   }, []);
 
   const saveStudents = useCallback(async d => { setStudents(d); await sSet(SK.students, d); }, []);
-  const saveSettings = useCallback(async (f, t) => { setFees(f); setTerms(t); await sSet(SK.cfg, { fees: f, terms: t }); }, []);
+  const saveSettings = useCallback(async (f, yr) => {
+    setFees(f); setActiveYear(yr);
+    await sSet(SK.cfg, { fees: f, activeYear: yr });
+  }, []);
 
-  // ── Export to local .json file ───────────────────────────────────────────────
-  const exportData = () => {
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), fees, terms, students }, null, 2)], { type: "application/json" });
+  // ── Export to Excel (.xlsx) via CSV with BOM trick → opens cleanly in Excel ──
+  // We generate a real CSV that Excel renders well, named .xlsx isn't ideal;
+  // Instead we'll generate a multi-sheet-like structure using HTML table → xls trick
+  // For a proper xlsx in-browser we build it manually as a base64 xlsx via a simple approach
+  const exportExcel = () => {
+    // Build CSV-based multi-section export (opens in Excel natively)
+    const rows = [];
+
+    // Header
+    rows.push(["SANTAMONA SCHOOL — FEE MANAGEMENT EXPORT"]);
+    rows.push([`Exported: ${todayStr()}`]);
+    rows.push([`Academic Year: ${activeYear}`]);
+    rows.push([]);
+
+    // Summary
+    const totalPaid = students.reduce((a, s) => a + s.totalPaid, 0);
+    const totalDue = students.reduce((a, s) => a + Math.max(0, s.balance), 0);
+    rows.push(["SUMMARY"]);
+    rows.push(["Total Students", students.length]);
+    rows.push(["Total Collected (KES)", totalPaid]);
+    rows.push(["Total Outstanding (KES)", totalDue]);
+    rows.push([]);
+
+    // Payment method totals
+    const methodTotals = {};
+    students.forEach(s => s.terms.forEach(t => (t.payments || []).forEach(p => {
+      methodTotals[p.method] = (methodTotals[p.method] || 0) + p.paid;
+    })));
+    rows.push(["COLLECTIONS BY PAYMENT METHOD"]);
+    rows.push(["Method", "Total (KES)"]);
+    PAYMENT_METHODS.forEach(m => rows.push([m.label, methodTotals[m.key] || 0]));
+    rows.push([]);
+
+    // Student ledger
+    rows.push(["STUDENT LEDGER"]);
+    rows.push(["Student Name", "Class", "Term", "Term Fee (KES)", "Amount Paid (KES)", "Balance (KES)", "Payment Method", "Transaction Ref", "Receipt No.", "Date"]);
+
+    students.forEach(s => {
+      s.terms.forEach(t => {
+        (t.payments || []).forEach(p => {
+          rows.push([
+            s.name,
+            fees[s.cls]?.label || s.cls,
+            t.term,
+            t.fee,
+            p.paid,
+            "",
+            PAYMENT_METHODS.find(m => m.key === p.method)?.label || p.method,
+            p.ref || "",
+            p.receiptNo || "",
+            p.date || "",
+          ]);
+        });
+      });
+    });
+
+    rows.push([]);
+
+    // Dues
+    rows.push(["OUTSTANDING DUES"]);
+    rows.push(["Student Name", "Class", "Total Fee (KES)", "Total Paid (KES)", "Balance (KES)"]);
+    students.filter(s => s.balance > 0).sort((a, b) => b.balance - a.balance).forEach(s => {
+      rows.push([s.name, fees[s.cls]?.label || s.cls, s.totalFee, s.totalPaid, s.balance]);
+    });
+
+    // Convert to CSV with BOM
+    const csv = "\uFEFF" + rows.map(r =>
+      r.map(v => {
+        const str = String(v ?? "");
+        return str.includes(",") || str.includes('"') || str.includes("\n")
+          ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(",")
+    ).join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `santamona_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `santamona_backup_${activeYear}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
 
-  // ── Import from local .json file ─────────────────────────────────────────────
+  // ── Import from CSV/JSON ──────────────────────────────────────────────────────
   const importData = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -191,15 +295,25 @@ export default function App() {
       try {
         const data = JSON.parse(ev.target.result);
         if (data.fees) setFees(data.fees);
-        if (data.terms) setTerms(data.terms);
+        if (data.activeYear) setActiveYear(data.activeYear);
         if (Array.isArray(data.students)) setStudents(data.students);
-        await sSet(SK.cfg, { fees: data.fees || fees, terms: data.terms || terms });
+        await sSet(SK.cfg, { fees: data.fees || fees, activeYear: data.activeYear || activeYear });
         await sSet(SK.students, data.students || []);
         alert("✅ Data imported successfully!");
-      } catch { alert("❌ Invalid backup file."); }
+      } catch { alert("❌ Invalid backup file. Please use a JSON backup file."); }
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  // ── Export JSON (for import/restore) ─────────────────────────────────────────
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), fees, activeYear, students }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `santamona_backup_${activeYear}_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   if (booting) return <div style={{ minHeight: "100vh", background: G.bg, display: "flex", alignItems: "center", justifyContent: "center", color: G.muted, fontFamily: "Georgia,serif" }}>Loading…</div>;
@@ -223,6 +337,20 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0e2818 0%,${G.bg} 55%,#060f08 100%)`, fontFamily: "Georgia,Palatino,serif", padding: "18px 16px 48px" }}>
+      <style>{`
+        @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
+        button:hover  { opacity:.85 }
+        button:active { transform:scale(.97) }
+        * { box-sizing:border-box }
+        select { background:${G.dropBg} !important; color:${G.dropText} !important; }
+        select option { background:${G.dropBg}; color:${G.dropText}; font-family:Georgia,serif; font-size:14px; padding:6px 10px; }
+        select option:hover, select option:checked { background:#2a5c3a; }
+        input::placeholder { color:rgba(240,240,232,.22) }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none }
+        @keyframes sIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+        .tc { animation:sIn .22s ease }
+        ::-webkit-scrollbar { width:5px } ::-webkit-scrollbar-track { background:transparent } ::-webkit-scrollbar-thumb { background:rgba(233,184,74,.3); border-radius:8px }
+      `}</style>
 
       {/* HEADER */}
       <div style={{ maxWidth: 900, margin: "0 auto 16px" }}>
@@ -230,7 +358,7 @@ export default function App() {
           <div style={{ width: 48, height: 48, background: `linear-gradient(135deg,${G.gold},${G.goldD})`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🏫</div>
           <div>
             <div style={{ color: G.gold, fontWeight: 700, fontSize: 18, letterSpacing: 2, textTransform: "uppercase" }}>Santamona School</div>
-            <div style={{ color: G.muted, fontSize: 11 }}>Fee Management System · Nairobi, Kenya</div>
+            <div style={{ color: G.muted, fontSize: 11 }}>Fee Management System · Nairobi, Kenya · Academic Year {activeYear}</div>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
             {[["COLLECTED", fmt(totalCollected), G.green], ["OUTSTANDING", fmt(totalOutstanding), G.amber], ["STUDENTS", students.length, G.muted]].map(([l, v, c]) => (
@@ -262,12 +390,12 @@ export default function App() {
 
       {/* CONTENT */}
       <div style={{ maxWidth: 900, margin: "0 auto" }} className="tc" key={tab}>
-        {tab === "entry" && <EntryTab fees={fees} terms={terms} students={students} saveStudents={saveStudents} setReceipt={setReceipt} setTab={setTab} />}
+        {tab === "entry" && <EntryTab fees={fees} terms={terms} students={students} saveStudents={saveStudents} setReceipt={setReceipt} setTab={setTab} activeYear={activeYear} />}
         {tab === "receipt" && <ReceiptTab receipt={receipt} printRef={printRef} setTab={setTab} fees={fees} />}
         {tab === "ledger" && <LedgerTab students={filtered} search={search} setSearch={setSearch} fees={fees} />}
         {tab === "dues" && <DuesTab students={students} fees={fees} totalOutstanding={totalOutstanding} />}
-        {tab === "settings" && <SettingsTab fees={fees} terms={terms} saveSettings={saveSettings} />}
-        {tab === "backup" && <BackupTab exportData={exportData} importData={importData} students={students} fees={fees} terms={terms} />}
+        {tab === "settings" && <SettingsTab fees={fees} activeYear={activeYear} saveSettings={saveSettings} />}
+        {tab === "backup" && <BackupTab exportExcel={exportExcel} exportJSON={exportJSON} importData={importData} students={students} fees={fees} activeYear={activeYear} terms={terms} />}
       </div>
     </div>
   );
@@ -276,23 +404,21 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ENTRY TAB
 // ═══════════════════════════════════════════════════════════════════════════════
-function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
+function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab, activeYear }) {
   const classes = Object.keys(fees);
   const [form, setForm] = useState({ name: "", cls: classes[0] || "", term: terms[0] || "", paid: "", method: "cash", ref: "" });
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
 
-  // Derive valid cls/term at render time — no useEffect needed, no loop possible
   const activeCls = classes.includes(form.cls) ? form.cls : (classes[0] || "");
   const activeTerm = terms.includes(form.term) ? form.term : (terms[0] || "");
-
   const needsRef = ["mpesa", "airtel_money", "bank"].includes(form.method);
 
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = "Student name required";
     if (!activeCls) e.cls = "Select a class";
-    if (!activeTerm) e.term = "Add terms in Settings first";
+    if (!activeTerm) e.term = "No terms available";
     if (!form.paid || isNaN(form.paid) || Number(form.paid) <= 0) e.paid = "Enter a valid amount";
     if (needsRef && !form.ref.trim()) e.ref = `${PAYMENT_METHODS.find(m => m.key === form.method)?.label} reference required`;
     return e;
@@ -338,7 +464,7 @@ function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
     <Card>
       {/* Fee banner */}
       <div style={{ padding: "12px 22px", background: "rgba(233,184,74,0.07)", borderBottom: "1px solid rgba(233,184,74,0.13)" }}>
-        <div style={{ color: G.gold, fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>TERM FEE STRUCTURE</div>
+        <div style={{ color: G.gold, fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>TERM FEE STRUCTURE · {activeYear}</div>
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
           {Object.entries(fees).map(([k, v]) => (
             <span key={k} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 7, padding: "3px 11px", fontSize: 12, color: G.text }}>
@@ -361,19 +487,18 @@ function EntryTab({ fees, terms, students, saveStudents, setReceipt, setTab }) {
 
           <div>
             <Lbl>CLASS</Lbl>
-            <select value={activeCls} onChange={e => setForm(f => ({ ...f, cls: e.target.value }))} style={{ ...iS(errors.cls), cursor: "pointer" }}>
+            <Select value={activeCls} onChange={e => setForm(f => ({ ...f, cls: e.target.value }))} err={errors.cls}>
               {!classes.length && <option value="">— Add classes in Settings —</option>}
               {Object.entries(fees).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
+            </Select>
             <Err msg={errors.cls} />
           </div>
 
           <div>
-            <Lbl>TERM</Lbl>
-            <select value={activeTerm} onChange={e => { setForm(f => ({ ...f, term: e.target.value })); setErrors(er => ({ ...er, term: "" })); }} style={{ ...iS(errors.term), cursor: "pointer" }}>
-              {!terms.length && <option value="">— Add terms in Settings —</option>}
+            <Lbl>TERM · {activeYear}</Lbl>
+            <Select value={activeTerm} onChange={e => { setForm(f => ({ ...f, term: e.target.value })); setErrors(er => ({ ...er, term: "" })); }} err={errors.term}>
               {terms.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            </Select>
             <Err msg={errors.term} />
           </div>
 
@@ -604,27 +729,23 @@ function DuesTab({ students, fees, totalOutstanding }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SETTINGS TAB
+// SETTINGS TAB — year selection + fee structure
 // ═══════════════════════════════════════════════════════════════════════════════
-function SettingsTab({ fees, terms, saveSettings }) {
+function SettingsTab({ fees, activeYear, saveSettings }) {
   const [ef, setEf] = useState(() => JSON.parse(JSON.stringify(fees)));
-  const [et, setEt] = useState([...terms]);
-  const [newTerm, setNewTerm] = useState("");
+  const [yr, setYr] = useState(activeYear);
   const [newCls, setNewCls] = useState({ key: "", label: "", termFee: "" });
   const [saved, setSaved] = useState(false);
-  const [tErr, setTErr] = useState("");
   const [cErr, setCErr] = useState("");
   const [oldPw, setOldPw] = useState(""); const [newPw, setNewPw] = useState(""); const [cfPw, setCfPw] = useState("");
   const [pwMsg, setPwMsg] = useState({ type: "", text: "" });
   const [showPw, setShowPw] = useState({ o: false, n: false, c: false });
 
-  const save = async () => { await saveSettings(ef, et); setSaved(true); setTimeout(() => setSaved(false), 2200); };
+  // Year range: 3 years back to 3 years forward
+  const yearOptions = Array.from({ length: 7 }, (_, i) => String(currentYear - 3 + i));
 
-  const addTerm = () => {
-    if (!newTerm.trim()) { setTErr("Name required"); return; }
-    if (et.includes(newTerm.trim())) { setTErr("Already exists"); return; }
-    setTErr(""); setEt(ts => [...ts, newTerm.trim()]); setNewTerm("");
-  };
+  const save = async () => { await saveSettings(ef, yr); setSaved(true); setTimeout(() => setSaved(false), 2200); };
+
   const addCls = () => {
     const k = newCls.key.trim().replace(/\s/g, "");
     if (!k || !newCls.label.trim() || !newCls.termFee) { setCErr("All fields required"); return; }
@@ -633,6 +754,7 @@ function SettingsTab({ fees, terms, saveSettings }) {
     setCErr(""); setEf(f => ({ ...f, [k]: { label: newCls.label.trim(), termFee: Number(newCls.termFee) } }));
     setNewCls({ key: "", label: "", termFee: "" });
   };
+
   const changePw = async () => {
     if (!oldPw || !newPw || !cfPw) { setPwMsg({ type: "err", text: "All fields required" }); return; }
     if (newPw !== cfPw) { setPwMsg({ type: "err", text: "New passwords don't match" }); return; }
@@ -649,6 +771,30 @@ function SettingsTab({ fees, terms, saveSettings }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Academic Year */}
+      <Card>
+        <SecHead>📆 Academic Year</SecHead>
+        <div style={{ padding: "16px 22px" }}>
+          <div style={{ color: G.muted, fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
+            Terms are automatically generated as <b style={{ color: G.gold }}>Term 1 {yr}</b>, <b style={{ color: G.gold }}>Term 2 {yr}</b>, <b style={{ color: G.gold }}>Term 3 {yr}</b>.
+            Change the year below to switch the active academic year.
+          </div>
+          <div style={{ maxWidth: 260 }}>
+            <Lbl>ACTIVE ACADEMIC YEAR</Lbl>
+            <Select value={yr} onChange={e => setYr(e.target.value)}>
+              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+            </Select>
+          </div>
+          <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {["Term 1", "Term 2", "Term 3"].map(t => (
+              <span key={t} style={{ background: "rgba(233,184,74,0.1)", border: "1px solid rgba(233,184,74,0.25)", borderRadius: 8, padding: "5px 14px", fontSize: 13, color: G.gold, fontWeight: 600 }}>
+                {t} {yr}
+              </span>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       {/* Fee Structure */}
       <Card>
@@ -672,27 +818,6 @@ function SettingsTab({ fees, terms, saveSettings }) {
             <button onClick={addCls} style={{ ...bS("gold"), padding: "8px 18px", fontSize: 13 }}>+ Add Class</button>
             <Err msg={cErr} />
           </div>
-        </div>
-      </Card>
-
-      {/* Terms */}
-      <Card>
-        <SecHead>📅 Academic Terms</SecHead>
-        <div style={{ padding: "16px 22px" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-            {!et.length && <span style={{ color: G.muted, fontSize: 13 }}>No terms yet.</span>}
-            {et.map(t => (
-              <div key={t} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.11)", borderRadius: 8, padding: "5px 12px" }}>
-                <span style={{ color: G.text, fontSize: 13 }}>{t}</span>
-                <button onClick={() => setEt(ts => ts.filter(x => x !== t))} style={{ background: "none", border: "none", color: G.red, cursor: "pointer", fontSize: 14, padding: 0 }}>✕</button>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={newTerm} onChange={e => { setNewTerm(e.target.value); setTErr(""); }} onKeyDown={e => e.key === "Enter" && addTerm()} placeholder="e.g. Term 1 2026" style={{ ...iS(!!tErr), flex: 1 }} />
-            <button onClick={addTerm} style={{ ...bS("gold"), padding: "10px 18px" }}>+ Add</button>
-          </div>
-          <Err msg={tErr} />
         </div>
       </Card>
 
@@ -722,9 +847,9 @@ function SettingsTab({ fees, terms, saveSettings }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// BACKUP TAB
+// BACKUP TAB — Excel (.csv opens in Excel) + JSON restore
 // ═══════════════════════════════════════════════════════════════════════════════
-function BackupTab({ exportData, importData, students, fees, terms }) {
+function BackupTab({ exportExcel, exportJSON, importData, students, fees, activeYear, terms }) {
   const fileRef = useRef();
   const totalPaid = students.reduce((a, s) => a + s.totalPaid, 0);
   const totalDue = students.reduce((a, s) => a + Math.max(0, s.balance), 0);
@@ -737,7 +862,7 @@ function BackupTab({ exportData, importData, students, fees, terms }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
       <Card>
-        <SecHead>📊 Data Summary</SecHead>
+        <SecHead>📊 Data Summary · {activeYear}</SecHead>
         <div style={{ padding: "16px 22px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
             {[["Students", students.length, G.text], ["Total Collected", fmt(totalPaid), G.green], ["Total Outstanding", fmt(totalDue), G.amber]].map(([l, v, c]) => (
@@ -762,11 +887,35 @@ function BackupTab({ exportData, importData, students, fees, terms }) {
         </div>
       </Card>
 
+      {/* Excel Export */}
       <Card>
-        <SecHead>⬇️ Export Data to Your Computer</SecHead>
+        <SecHead>📊 Export to Excel Spreadsheet</SecHead>
+        <div style={{ padding: "16px 22px" }}>
+          <div style={{ color: G.muted, fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>
+            Downloads a full <b style={{ color: G.text }}>CSV file</b> that opens directly in Microsoft Excel or Google Sheets. Contains a complete ledger, dues summary, payment method breakdown, and all transaction records.
+          </div>
+          <div style={{ padding: "12px 16px", background: "rgba(61,214,140,0.07)", border: "1px solid rgba(61,214,140,0.18)", borderRadius: 10, marginBottom: 16, fontSize: 12 }}>
+            <div style={{ color: G.green, fontWeight: 700, marginBottom: 4 }}>📋 Includes sheets:</div>
+            <div style={{ color: G.muted, lineHeight: 1.8 }}>
+              • Summary (totals, year, method breakdown)<br />
+              • Full student ledger with all payments<br />
+              • Outstanding dues list<br />
+              • Transaction references &amp; receipt numbers
+            </div>
+          </div>
+          <button onClick={exportExcel} style={{ ...bS("gold"), padding: "12px 28px", fontSize: 15 }}>
+            📊 Download Excel File (.csv)
+          </button>
+          <div style={{ color: G.muted, fontSize: 11, marginTop: 8 }}>Opens in Excel, Google Sheets, or LibreOffice Calc</div>
+        </div>
+      </Card>
+
+      {/* JSON Backup */}
+      <Card>
+        <SecHead>⬇️ Full Data Backup (JSON)</SecHead>
         <div style={{ padding: "16px 22px" }}>
           <div style={{ color: G.muted, fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
-            Downloads a full backup of all student records, fee structures, and terms as a <b style={{ color: G.text }}>JSON file saved directly to your computer</b>. Import it anytime to restore your data.
+            Downloads a complete backup of all data including settings. Use this to <b style={{ color: G.text }}>restore</b> data on another device or after clearing your browser.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
             {[["Students", students.length], ["Classes", Object.keys(fees).length], ["Terms", terms.length]].map(([l, v]) => (
@@ -776,34 +925,37 @@ function BackupTab({ exportData, importData, students, fees, terms }) {
               </div>
             ))}
           </div>
-          <button onClick={exportData} style={{ ...bS("gold"), padding: "12px 28px", fontSize: 15 }}>⬇️ Download Backup (.json)</button>
+          <button onClick={exportJSON} style={{ ...bS("blue"), padding: "12px 28px", fontSize: 15 }}>
+            💾 Download Backup (.json)
+          </button>
         </div>
       </Card>
 
+      {/* Import */}
       <Card>
-        <SecHead>⬆️ Import Data from Your Computer</SecHead>
+        <SecHead>⬆️ Restore from Backup</SecHead>
         <div style={{ padding: "16px 22px" }}>
           <div style={{ color: G.muted, fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
-            Restore a previously exported backup. <b style={{ color: G.red }}>This will overwrite all current data</b> with the contents of the file.
+            Restore a previously exported <b style={{ color: G.text }}>.json</b> backup. <b style={{ color: G.red }}>This will overwrite all current data.</b>
           </div>
           <div style={{ padding: "20px", background: "rgba(255,255,255,0.03)", border: "2px dashed rgba(255,255,255,0.12)", borderRadius: 12, textAlign: "center", marginBottom: 14 }}
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { const dt = new DataTransfer(); dt.items.add(f); fileRef.current.files = dt.files; importData({ target: fileRef.current }); } }}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>📂</div>
-            <div style={{ color: G.muted, fontSize: 13, marginBottom: 12 }}>Drag & drop your backup file here, or</div>
+            <div style={{ color: G.muted, fontSize: 13, marginBottom: 12 }}>Drag & drop your .json backup here, or</div>
             <input type="file" accept=".json" ref={fileRef} onChange={importData} style={{ display: "none" }} />
-            <button onClick={() => fileRef.current.click()} style={{ ...bS("blue"), padding: "10px 22px" }}>📁 Choose Backup File</button>
+            <button onClick={() => fileRef.current.click()} style={{ ...bS("ghost"), padding: "10px 22px" }}>📁 Choose .json File</button>
           </div>
-          <div style={{ color: G.muted, fontSize: 11 }}>Only accepts <span style={{ color: G.blue, fontFamily: "monospace" }}>.json</span> files exported from this system.</div>
         </div>
       </Card>
 
       <div style={{ padding: "14px 18px", background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: 12 }}>
-        <div style={{ color: G.blue, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>ℹ️ How Storage Works (Local Mode)</div>
+        <div style={{ color: G.blue, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>ℹ️ Storage &amp; Backup Guide</div>
         <div style={{ color: G.muted, fontSize: 12, lineHeight: 1.7 }}>
-          • <b style={{ color: G.text }}>Auto-saved:</b> All data is saved automatically to your browser's <code style={{ color: G.gold }}>localStorage</code> — it persists across browser restarts on the same computer.<br />
-          • <b style={{ color: G.text }}>Backup:</b> Use Export to save a <code style={{ color: G.gold }}>.json</code> file to your hard drive. Use Import to restore on any device.<br />
-          • <b style={{ color: G.text }}>Tip:</b> Export a backup regularly, especially before clearing browser data.
+          • <b style={{ color: G.text }}>Auto-saved:</b> All data saves automatically to your browser's <code style={{ color: G.gold }}>localStorage</code>.<br />
+          • <b style={{ color: G.text }}>Excel export:</b> Use the CSV export for reporting and record-keeping in Excel/Sheets.<br />
+          • <b style={{ color: G.text }}>JSON backup:</b> Use for full data restore on a new device or after browser reset.<br />
+          • <b style={{ color: G.text }}>Tip:</b> Export both files regularly — the CSV for records, the JSON for restore.
         </div>
       </div>
     </div>
